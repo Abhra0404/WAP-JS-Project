@@ -144,10 +144,7 @@ function processContributions(weeks) {
 // ─── FETCH ───
 async function fetchData() {
   const username = $("username").value.trim();
-  const token = ENV.GITHUB_TOKEN;
-
   if (!username) return alert("Please enter a GitHub username.");
-  if (!token || token === "YOUR_GITHUB_PAT_HERE") return alert("Please set your GitHub PAT in .env.js");
 
   $("loading").classList.remove("hidden");
   $("dashboard").classList.add("hidden");
@@ -157,9 +154,9 @@ async function fetchData() {
   $("fetch-btn").disabled = true;
 
   try {
-    const res = await fetch("https://api.github.com/graphql", {
+    const res = await fetch("/api/github", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: `query($login:String!){user(login:$login){name login avatarUrl bio company location websiteUrl
           followers{totalCount}following{totalCount}
