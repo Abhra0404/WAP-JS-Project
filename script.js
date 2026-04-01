@@ -19,57 +19,9 @@ const getLevel = (c) => c === 0 ? 0 : c < 3 ? 1 : c < 6 ? 2 : c < 10 ? 3 : 4;
 
 const tooltip = $("tooltip");
 
-// ─── SEARCH HISTORY (in-memory) ───
-const history = [];
-
-function addHistory(name) {
-  const i = history.findIndex(u => u.toLowerCase() === name.toLowerCase());
-  if (i > -1) history.splice(i, 1);
-  history.unshift(name);
-  if (history.length > 10) history.pop();
-}
-
-function showHistory(filter = "") {
-  const dd = $("history-dropdown");
-  const list = filter ? history.filter(u => u.toLowerCase().includes(filter.toLowerCase())) : history;
-  if (!list.length) { dd.classList.add("hidden"); return; }
-
-  dd.innerHTML = list.map(u =>
-    `<div class="history-item">
-      <div class="history-user" data-user="${escapeHtml(u)}">
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="#8b949e"><path d="M10.561 8.073a6.005 6.005 0 013.432 5.142.75.75 0 11-1.498.07 4.5 4.5 0 00-8.99 0 .75.75 0 11-1.498-.07 6.004 6.004 0 013.431-5.142 3.999 3.999 0 115.123 0zM10.5 5a2.5 2.5 0 10-5 0 2.5 2.5 0 005 0z"/></svg>
-        <span>${escapeHtml(u)}</span>
-      </div>
-      <button class="history-remove" data-user="${escapeHtml(u)}">&times;</button>
-    </div>`
-  ).join("") + `<button class="history-clear">Clear history</button>`;
-  dd.classList.remove("hidden");
-}
-
-$("history-dropdown").addEventListener("click", (e) => {
-  const dd = $("history-dropdown");
-  const userEl = e.target.closest(".history-user");
-  const rmEl = e.target.closest(".history-remove");
-  if (rmEl) {
-    const i = history.indexOf(rmEl.dataset.user);
-    if (i > -1) history.splice(i, 1);
-    showHistory($("username").value);
-  } else if (userEl) {
-    $("username").value = userEl.dataset.user;
-    dd.classList.add("hidden");
-    fetchData();
-  } else if (e.target.closest(".history-clear")) {
-    history.length = 0;
-    dd.classList.add("hidden");
-  }
-});
-
 // ─── INPUT EVENTS ───
 const usernameInput = $("username");
-usernameInput.addEventListener("focus", () => showHistory(usernameInput.value));
-usernameInput.addEventListener("input", () => showHistory(usernameInput.value));
-usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { $("history-dropdown").classList.add("hidden"); fetchData(); } });
-document.addEventListener("click", (e) => { if (!e.target.closest(".search-wrap")) $("history-dropdown").classList.add("hidden"); });
+usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") fetchData(); });
 
 // ─── BACK NAVIGATION ───
 window.history.replaceState({ view: "landing" }, "");
@@ -172,7 +124,6 @@ async function fetchData() {
     const { data, errors } = await res.json();
     if (errors) return alert("GitHub API error: " + errors[0].message);
     if (!data?.user) return alert("User not found.");
-    addHistory(data.user.login);
     renderDashboard(data.user);
     window.history.pushState({ view: "dashboard" }, "");
   } catch (err) {
