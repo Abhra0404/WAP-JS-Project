@@ -1,154 +1,245 @@
-// ─── UTILS ───
-const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-};
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const WEEKDAYS_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+// ─── CONSTANTS ───
 
-const fmtNum = (n) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
-const shortDate = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-const dateRange = (a, b) => (a && b) ? shortDate(a) + " – " + shortDate(b) : "";
-const sanitizeColor = (c) => c && /^#[0-9a-fA-F]{3,6}$/.test(c) ? c : "#8b949e";
-const escapeHtml = (t) => { const d = el("div"); d.textContent = t; return d.innerHTML; };
-const getLevel = (c) => c === 0 ? 0 : c < 3 ? 1 : c < 6 ? 2 : c < 10 ? 3 : 4;
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+var WEEKDAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-const tooltip = $("tooltip");
+var STAR_SVG = '<path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.751.751 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>';
+var FORK_SVG = '<path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75v-.878a2.25 2.25 0 111.5 0v.878a2.25 2.25 0 01-2.25 2.25h-1.5v2.128a2.251 2.251 0 11-1.5 0V8.5h-1.5A2.25 2.25 0 013.5 6.25v-.878a2.25 2.25 0 111.5 0zM5 3.25a.75.75 0 10-1.5 0 .75.75 0 001.5 0zm6.75.75a.75.75 0 100-1.5.75.75 0 000 1.5zM8 12.75a.75.75 0 100-1.5.75.75 0 000 1.5z"/>';
 
-// ─── INPUT EVENTS ───
-const usernameInput = $("username");
-usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") fetchData(); });
+var tooltipEl = document.getElementById("tooltip");
 
-// ─── BACK NAVIGATION ───
+// ─── HELPER FUNCTIONS ───
+
+function formatNumber(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(n);
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function formatDateRange(startDate, endDate) {
+  if (startDate && endDate) return formatDate(startDate) + " – " + formatDate(endDate);
+  return "";
+}
+
+function safeColor(color) {
+  if (color && /^#[0-9a-fA-F]{3,6}$/.test(color)) return color;
+  return "#8b949e";
+}
+
+function escapeHtml(text) {
+  var div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function getContributionLevel(count) {
+  if (count === 0) return 0;
+  if (count < 3) return 1;
+  if (count < 6) return 2;
+  if (count < 10) return 3;
+  return 4;
+}
+
+function makeSmallSvg(pathContent) {
+  return '<svg viewBox="0 0 16 16" width="14" height="14" fill="#8b949e">' + pathContent + '</svg>';
+}
+
+// ─── INPUT & NAVIGATION ───
+
+document.getElementById("username").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") fetchData();
+});
+
 window.history.replaceState({ view: "landing" }, "");
-window.addEventListener("popstate", (e) => {
+window.addEventListener("popstate", function (e) {
   if (!e.state || e.state.view === "landing") {
-    $("dashboard").classList.add("hidden");
-    $("welcome").classList.remove("hidden");
-    $("username").value = "";
+    document.getElementById("dashboard").classList.add("hidden");
+    document.getElementById("welcome").classList.remove("hidden");
+    document.getElementById("username").value = "";
   }
 });
 
-// ─── SHARED SVG PATHS ───
-const SVG = {
-  star: '<path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.751.751 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>',
-  fork: '<path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75v-.878a2.25 2.25 0 111.5 0v.878a2.25 2.25 0 01-2.25 2.25h-1.5v2.128a2.251 2.251 0 11-1.5 0V8.5h-1.5A2.25 2.25 0 013.5 6.25v-.878a2.25 2.25 0 111.5 0zM5 3.25a.75.75 0 10-1.5 0 .75.75 0 001.5 0zm6.75.75a.75.75 0 100-1.5.75.75 0 000 1.5zM8 12.75a.75.75 0 100-1.5.75.75 0 000 1.5z"/>'
-};
-const miniSvg = (path) => `<svg viewBox="0 0 16 16" width="14" height="14" fill="#8b949e">${path}</svg>`;
+// ─── PROCESS CONTRIBUTION DATA ───
 
-// ─── DATA PROCESSING ───
 function processContributions(weeks) {
-  const allDays = weeks.flatMap(w => w.contributionDays).sort((a, b) => a.date.localeCompare(b.date));
-  const today = new Date().toISOString().slice(0, 10);
+  // Flatten all days from all weeks into one sorted array
+  var allDays = [];
+  for (var w = 0; w < weeks.length; w++) {
+    var days = weeks[w].contributionDays;
+    for (var d = 0; d < days.length; d++) {
+      allDays.push(days[d]);
+    }
+  }
+  allDays.sort(function (a, b) { return a.date.localeCompare(b.date); });
 
-  let bestDay = allDays[0], longestStreak = 0, tempStreak = 0, longestEnd = 0;
-  const weekdayTotals = new Array(7).fill(0);
-  const weekdayCounts = new Array(7).fill(0);
-  const monthly = {};
+  var today = new Date().toISOString().slice(0, 10);
+  var bestDay = allDays[0];
+  var longestStreak = 0;
+  var tempStreak = 0;
+  var longestEnd = 0;
+  var weekdayTotals = [0, 0, 0, 0, 0, 0, 0];
+  var weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
+  var monthly = {};
 
-  allDays.forEach((d, i) => {
-    const c = d.contributionCount;
+  for (var i = 0; i < allDays.length; i++) {
+    var day = allDays[i];
+    var count = day.contributionCount;
 
-    // Best day
-    if (c > bestDay.contributionCount) bestDay = d;
+    // Track the day with the most contributions
+    if (count > bestDay.contributionCount) {
+      bestDay = day;
+    }
 
-    // Longest streak
-    if (c > 0) { tempStreak++; if (tempStreak > longestStreak) { longestStreak = tempStreak; longestEnd = i; } }
-    else tempStreak = 0;
+    // Track longest streak
+    if (count > 0) {
+      tempStreak++;
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+        longestEnd = i;
+      }
+    } else {
+      tempStreak = 0;
+    }
 
-    // Weekday aggregation
-    weekdayTotals[d.weekday] += c;
-    weekdayCounts[d.weekday]++;
+    // Sum contributions by weekday
+    weekdayTotals[day.weekday] += count;
+    weekdayCounts[day.weekday]++;
 
-    // Monthly aggregation (avoid new Date — use string slicing)
-    const monthKey = d.date.slice(0, 7); // "YYYY-MM"
+    // Sum contributions by month ("YYYY-MM")
+    var monthKey = day.date.slice(0, 7);
     if (!monthly[monthKey]) monthly[monthKey] = 0;
-    monthly[monthKey] += c;
-  });
+    monthly[monthKey] += count;
+  }
 
-  // Current streak: walk backwards, but skip today if it has 0 (streak can still be alive)
-  let currentStreak = 0;
-  let startIdx = allDays.length - 1;
-  if (allDays[startIdx].date === today && allDays[startIdx].contributionCount === 0) startIdx--;
-  for (let i = startIdx; i >= 0; i--) {
-    if (allDays[i].contributionCount > 0) currentStreak++;
+  // Current streak: walk backwards from most recent day
+  // Skip today if it has 0 contributions (streak can still be alive)
+  var currentStreak = 0;
+  var lastIdx = allDays.length - 1;
+  if (allDays[lastIdx].date === today && allDays[lastIdx].contributionCount === 0) {
+    lastIdx--;
+  }
+  for (var j = lastIdx; j >= 0; j--) {
+    if (allDays[j].contributionCount > 0) currentStreak++;
     else break;
   }
-  const currentStart = startIdx - currentStreak + 1;
+  var currentStart = lastIdx - currentStreak + 1;
 
-  // Most active weekday
-  let bestWeekday = 0;
-  for (let i = 1; i < 7; i++) if (weekdayTotals[i] > weekdayTotals[bestWeekday]) bestWeekday = i;
+  // Find most active weekday
+  var bestWeekday = 0;
+  for (var k = 1; k < 7; k++) {
+    if (weekdayTotals[k] > weekdayTotals[bestWeekday]) bestWeekday = k;
+  }
 
   return {
-    allDays, bestDay, longestStreak,
-    longestStart: longestEnd - longestStreak + 1, longestEnd,
-    currentStreak, currentStart, startIdx,
-    weekdayTotals, weekdayCounts, bestWeekday,
-    monthly
+    allDays: allDays,
+    bestDay: bestDay,
+    longestStreak: longestStreak,
+    longestStart: longestEnd - longestStreak + 1,
+    longestEnd: longestEnd,
+    currentStreak: currentStreak,
+    currentStart: currentStart,
+    lastIdx: lastIdx,
+    weekdayTotals: weekdayTotals,
+    weekdayCounts: weekdayCounts,
+    bestWeekday: bestWeekday,
+    monthly: monthly
   };
 }
 
-// ─── FETCH ───
-async function fetchData() {
-  const username = $("username").value.trim();
-  if (!username) return alert("Please enter a GitHub username.");
+// ─── FETCH DATA FROM API ───
 
-  $("loading").classList.remove("hidden");
-  $("dashboard").classList.add("hidden");
-  $("welcome").classList.add("hidden");
-  $("btn-text").textContent = "";
-  $("btn-spinner").classList.remove("hidden");
-  $("fetch-btn").disabled = true;
+async function fetchData() {
+  var username = document.getElementById("username").value.trim();
+  if (!username) {
+    alert("Please enter a GitHub username.");
+    return;
+  }
+
+  // Show loading, hide other sections
+  document.getElementById("loading").classList.remove("hidden");
+  document.getElementById("dashboard").classList.add("hidden");
+  document.getElementById("welcome").classList.add("hidden");
+  document.getElementById("btn-text").textContent = "";
+  document.getElementById("btn-spinner").classList.remove("hidden");
+  document.getElementById("fetch-btn").disabled = true;
+
+  var query = `query($login:String!) {
+    user(login:$login) {
+      name login avatarUrl bio company location websiteUrl
+      followers { totalCount }
+      following { totalCount }
+      repositories(first:100, ownerAffiliations:OWNER, orderBy:{field:STARGAZERS, direction:DESC}, privacy:PUBLIC) {
+        totalCount
+        nodes { name description stargazerCount forkCount primaryLanguage { name color } url updatedAt }
+      }
+      pinnedItems(first:6, types:REPOSITORY) {
+        nodes { ...on Repository { name description stargazerCount forkCount primaryLanguage { name color } url } }
+      }
+      contributionsCollection {
+        totalCommitContributions
+        totalIssueContributions
+        totalPullRequestContributions
+        totalPullRequestReviewContributions
+        contributionCalendar {
+          totalContributions
+          weeks { contributionDays { date contributionCount weekday } }
+        }
+      }
+    }
+  }`;
 
   try {
-    const res = await fetch("/api/github", {
+    var response = await fetch("/api/github", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: `query($login:String!){user(login:$login){name login avatarUrl bio company location websiteUrl
-          followers{totalCount}following{totalCount}
-          repositories(first:100,ownerAffiliations:OWNER,orderBy:{field:STARGAZERS,direction:DESC},privacy:PUBLIC){
-            totalCount nodes{name description stargazerCount forkCount primaryLanguage{name color}url updatedAt}}
-          pinnedItems(first:6,types:REPOSITORY){nodes{...on Repository{name description stargazerCount forkCount primaryLanguage{name color}url}}}
-          contributionsCollection{totalCommitContributions totalIssueContributions totalPullRequestContributions totalPullRequestReviewContributions
-            contributionCalendar{totalContributions weeks{contributionDays{date contributionCount weekday}}}}}}`,
-        variables: { login: username }
-      })
+      body: JSON.stringify({ query: query, variables: { login: username } })
     });
 
-    const { data, errors } = await res.json();
-    if (errors) return alert("GitHub API error: " + errors[0].message);
-    if (!data?.user) return alert("User not found.");
-    renderDashboard(data.user);
+    var result = await response.json();
+
+    if (result.errors) {
+      alert("GitHub API error: " + result.errors[0].message);
+      return;
+    }
+    if (!result.data || !result.data.user) {
+      alert("User not found.");
+      return;
+    }
+
+    renderDashboard(result.data.user);
     window.history.pushState({ view: "dashboard" }, "");
   } catch (err) {
     console.error(err);
     alert("Error fetching data. Check your token and username.");
   } finally {
-    $("loading").classList.add("hidden");
-    $("btn-text").textContent = "Fetch";
-    $("btn-spinner").classList.add("hidden");
-    $("fetch-btn").disabled = false;
+    document.getElementById("loading").classList.add("hidden");
+    document.getElementById("btn-text").textContent = "Fetch";
+    document.getElementById("btn-spinner").classList.add("hidden");
+    document.getElementById("fetch-btn").disabled = false;
   }
 }
 
-// ─── ORCHESTRATOR ───
-function renderDashboard(user) {
-  $("dashboard").classList.remove("hidden");
+// ─── RENDER DASHBOARD (orchestrates all sections) ───
 
-  const cc = user.contributionsCollection;
-  const cal = cc.contributionCalendar;
-  const stats = processContributions(cal.weeks);
+function renderDashboard(user) {
+  document.getElementById("dashboard").classList.remove("hidden");
+
+  var contributions = user.contributionsCollection;
+  var calendar = contributions.contributionCalendar;
+  var stats = processContributions(calendar.weeks);
 
   renderProfile(user);
-  renderContribBreakdown(cc);
-  renderCalendar(cal.weeks, cal.totalContributions);
-  renderStats(stats, cal.totalContributions);
+  renderContribBreakdown(contributions);
+  renderCalendar(calendar.weeks, calendar.totalContributions);
+  renderStats(stats, calendar.totalContributions);
   renderMonthlyChart(stats.monthly);
   renderWeekdayChart(stats.weekdayTotals, stats.weekdayCounts);
   renderRepos(user.pinnedItems.nodes, user.repositories.nodes);
@@ -156,237 +247,351 @@ function renderDashboard(user) {
 }
 
 // ─── PROFILE ───
+
 function renderProfile(user) {
-  $("avatar").src = user.avatarUrl;
-  $("profile-name").textContent = user.name || user.login;
+  document.getElementById("avatar").src = user.avatarUrl;
+  document.getElementById("profile-name").textContent = user.name || user.login;
 
-  const loginEl = $("profile-login");
-  loginEl.textContent = "@" + user.login;
-  loginEl.href = "https://github.com/" + encodeURIComponent(user.login);
+  var loginLink = document.getElementById("profile-login");
+  loginLink.textContent = "@" + user.login;
+  loginLink.href = "https://github.com/" + encodeURIComponent(user.login);
 
-  const bioEl = $("profile-bio");
+  var bioEl = document.getElementById("profile-bio");
   bioEl.textContent = user.bio || "";
   bioEl.classList.toggle("hidden", !user.bio);
 
-  [["profile-company", "company-text", user.company],
-   ["profile-location", "location-text", user.location]
-  ].forEach(([wrapId, textId, val]) => {
-    $(wrapId).classList.toggle("hidden", !val);
-    if (val) $(textId).textContent = val;
-  });
+  // Company
+  document.getElementById("profile-company").classList.toggle("hidden", !user.company);
+  if (user.company) document.getElementById("company-text").textContent = user.company;
 
-  const wsWrap = $("profile-website"), wsLink = $("website-link");
-  wsWrap.classList.toggle("hidden", !user.websiteUrl);
+  // Location
+  document.getElementById("profile-location").classList.toggle("hidden", !user.location);
+  if (user.location) document.getElementById("location-text").textContent = user.location;
+
+  // Website
+  var websiteWrap = document.getElementById("profile-website");
+  var websiteLink = document.getElementById("website-link");
+  websiteWrap.classList.toggle("hidden", !user.websiteUrl);
   if (user.websiteUrl) {
-    wsLink.href = user.websiteUrl;
-    wsLink.textContent = user.websiteUrl.replace(/^https?:\/\//, "");
+    websiteLink.href = user.websiteUrl;
+    websiteLink.textContent = user.websiteUrl.replace(/^https?:\/\//, "");
   }
 
-  $("followers-count").textContent = fmtNum(user.followers.totalCount);
-  $("following-count").textContent = fmtNum(user.following.totalCount);
-  $("repos-count").textContent = fmtNum(user.repositories.totalCount);
+  document.getElementById("followers-count").textContent = formatNumber(user.followers.totalCount);
+  document.getElementById("following-count").textContent = formatNumber(user.following.totalCount);
+  document.getElementById("repos-count").textContent = formatNumber(user.repositories.totalCount);
 }
 
 // ─── CONTRIBUTION BREAKDOWN ───
-function renderContribBreakdown(cc) {
-  $("commit-count").textContent = fmtNum(cc.totalCommitContributions);
-  $("pr-count").textContent = fmtNum(cc.totalPullRequestContributions);
-  $("issue-count").textContent = fmtNum(cc.totalIssueContributions);
-  $("review-count").textContent = fmtNum(cc.totalPullRequestReviewContributions);
+
+function renderContribBreakdown(contributions) {
+  document.getElementById("commit-count").textContent = formatNumber(contributions.totalCommitContributions);
+  document.getElementById("pr-count").textContent = formatNumber(contributions.totalPullRequestContributions);
+  document.getElementById("issue-count").textContent = formatNumber(contributions.totalIssueContributions);
+  document.getElementById("review-count").textContent = formatNumber(contributions.totalPullRequestReviewContributions);
 }
 
-// ─── CONTRIBUTION GRAPH ───
+// ─── CONTRIBUTION GRAPH (calendar heatmap) ───
+
 function renderCalendar(weeks, total) {
-  const calEl = $("calendar"), monthsEl = $("months");
-  calEl.innerHTML = monthsEl.innerHTML = "";
+  var calendarEl = document.getElementById("calendar");
+  var monthsEl = document.getElementById("months");
+  calendarEl.innerHTML = "";
+  monthsEl.innerHTML = "";
 
-  $("total-label").textContent = `${total.toLocaleString()} contributions in the last year`;
+  document.getElementById("total-label").textContent =
+    total.toLocaleString() + " contributions in the last year";
 
-  // Month labels
-  let lastMonth = -1;
-  const monthSpans = [];
-  weeks.forEach((w, i) => {
-    const m = +w.contributionDays[0].date.slice(5, 7) - 1; // month from "YYYY-MM-DD"
-    if (m !== lastMonth) { monthSpans.push({ m, col: i }); lastMonth = m; }
-  });
+  // Build month labels — track when the month changes across weeks
+  var lastMonth = -1;
+  var monthPositions = [];
+  for (var i = 0; i < weeks.length; i++) {
+    var month = parseInt(weeks[i].contributionDays[0].date.slice(5, 7)) - 1;
+    if (month !== lastMonth) {
+      monthPositions.push({ month: month, column: i });
+      lastMonth = month;
+    }
+  }
 
-  const mFrag = document.createDocumentFragment();
-  monthSpans.forEach((ms, i) => {
-    const span = el("span", null, MONTHS[ms.m]);
-    const nextCol = i < monthSpans.length - 1 ? monthSpans[i + 1].col : weeks.length;
-    span.style.gridColumn = `${ms.col + 1} / span ${nextCol - ms.col}`;
-    mFrag.appendChild(span);
-  });
-  monthsEl.appendChild(mFrag);
+  for (var m = 0; m < monthPositions.length; m++) {
+    var span = document.createElement("span");
+    span.textContent = MONTHS[monthPositions[m].month];
+    var nextColumn = (m < monthPositions.length - 1) ? monthPositions[m + 1].column : weeks.length;
+    span.style.gridColumn = (monthPositions[m].column + 1) + " / span " + (nextColumn - monthPositions[m].column);
+    monthsEl.appendChild(span);
+  }
 
-  const cols = `repeat(${weeks.length}, 12px)`;
-  calEl.style.gridTemplateColumns = cols;
-  monthsEl.style.gridTemplateColumns = cols;
+  var gridColumns = "repeat(" + weeks.length + ", 12px)";
+  calendarEl.style.gridTemplateColumns = gridColumns;
+  monthsEl.style.gridTemplateColumns = gridColumns;
 
-  // Day cells using DocumentFragment
-  const frag = document.createDocumentFragment();
-  weeks.forEach(w => {
-    const dayMap = new Map(w.contributionDays.map(d => [d.weekday, d]));
-    for (let d = 0; d < 7; d++) {
-      const day = dayMap.get(d);
-      const cell = el("div");
+  // Build day cells
+  for (var w = 0; w < weeks.length; w++) {
+    // Index each day by its weekday number (0-6) for this week
+    var daysByWeekday = {};
+    var weekDays = weeks[w].contributionDays;
+    for (var d = 0; d < weekDays.length; d++) {
+      daysByWeekday[weekDays[d].weekday] = weekDays[d];
+    }
 
-      if (day) {
-        cell.className = `day level-${getLevel(day.contributionCount)}`;
-        cell.addEventListener("mouseenter", () => {
-          const c = day.contributionCount;
-          tooltip.textContent = `${c} ${c === 1 ? "contribution" : "contributions"} on ${shortDate(day.date)}`;
-          tooltip.style.display = "block";
-        });
-        cell.addEventListener("mousemove", (e) => {
-          tooltip.style.left = e.pageX + 12 + "px";
-          tooltip.style.top = e.pageY - 34 + "px";
-        });
-        cell.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+    for (var dayNum = 0; dayNum < 7; dayNum++) {
+      var cell = document.createElement("div");
+      var dayData = daysByWeekday[dayNum];
+
+      if (dayData) {
+        cell.className = "day level-" + getContributionLevel(dayData.contributionCount);
+        addTooltipEvents(cell, dayData);
       } else {
         cell.className = "day day-empty";
       }
-      frag.appendChild(cell);
+
+      calendarEl.appendChild(cell);
     }
+  }
+}
+
+function addTooltipEvents(cell, dayData) {
+  cell.addEventListener("mouseenter", function () {
+    var count = dayData.contributionCount;
+    var word = (count === 1) ? "contribution" : "contributions";
+    tooltipEl.textContent = count + " " + word + " on " + formatDate(dayData.date);
+    tooltipEl.style.display = "block";
   });
-  calEl.appendChild(frag);
+
+  cell.addEventListener("mousemove", function (e) {
+    tooltipEl.style.left = (e.pageX + 12) + "px";
+    tooltipEl.style.top = (e.pageY - 34) + "px";
+  });
+
+  cell.addEventListener("mouseleave", function () {
+    tooltipEl.style.display = "none";
+  });
 }
 
 // ─── STATS ───
-function renderStats(s, total) {
-  const { allDays, bestDay, longestStreak, longestStart, longestEnd, currentStreak, currentStart, startIdx, bestWeekday, weekdayTotals, weekdayCounts } = s;
-  const dailyAvg = allDays.length > 0 ? (total / allDays.length).toFixed(1) : "0";
 
-  $("total").textContent = total.toLocaleString();
-  $("current").textContent = currentStreak + " days";
-  $("current-dates").textContent = currentStreak > 0 ? dateRange(allDays[currentStart]?.date, allDays[startIdx]?.date) : "";
-  $("longest").textContent = longestStreak + " days";
-  $("longest-dates").textContent = longestStreak > 0 ? dateRange(allDays[longestStart]?.date, allDays[longestEnd]?.date) : "";
-  $("best-day").textContent = bestDay.contributionCount + " contributions";
-  $("best-day-date").textContent = shortDate(bestDay.date);
-  $("daily-avg").textContent = dailyAvg + " / day";
-  $("active-weekday").textContent = WEEKDAYS[bestWeekday];
-  $("active-weekday-avg").textContent = (weekdayTotals[bestWeekday] / weekdayCounts[bestWeekday]).toFixed(1) + " avg contributions";
+function renderStats(stats, total) {
+  var allDays = stats.allDays;
+  var dailyAvg = allDays.length > 0 ? (total / allDays.length).toFixed(1) : "0";
+
+  document.getElementById("total").textContent = total.toLocaleString();
+
+  document.getElementById("current").textContent = stats.currentStreak + " days";
+  document.getElementById("current-dates").textContent =
+    stats.currentStreak > 0
+      ? formatDateRange(allDays[stats.currentStart]?.date, allDays[stats.lastIdx]?.date)
+      : "";
+
+  document.getElementById("longest").textContent = stats.longestStreak + " days";
+  document.getElementById("longest-dates").textContent =
+    stats.longestStreak > 0
+      ? formatDateRange(allDays[stats.longestStart]?.date, allDays[stats.longestEnd]?.date)
+      : "";
+
+  document.getElementById("best-day").textContent = stats.bestDay.contributionCount + " contributions";
+  document.getElementById("best-day-date").textContent = formatDate(stats.bestDay.date);
+
+  document.getElementById("daily-avg").textContent = dailyAvg + " / day";
+
+  document.getElementById("active-weekday").textContent = WEEKDAYS[stats.bestWeekday];
+  var weekdayAvg = (stats.weekdayTotals[stats.bestWeekday] / stats.weekdayCounts[stats.bestWeekday]).toFixed(1);
+  document.getElementById("active-weekday-avg").textContent = weekdayAvg + " avg contributions";
 }
 
 // ─── MONTHLY CHART ───
+
 function renderMonthlyChart(monthly) {
-  const sorted = Object.keys(monthly).sort().map(k => ({
-    label: MONTHS[+k.slice(5) - 1],
-    total: monthly[k]
-  }));
-  const max = Math.max(...sorted.map(m => m.total), 1);
+  // Sort months chronologically and find the max for scaling bars
+  var keys = Object.keys(monthly).sort();
+  var monthData = [];
+  var max = 1;
 
-  const container = $("monthly-chart");
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var monthIndex = parseInt(key.slice(5)) - 1;
+    var value = monthly[key];
+    monthData.push({ label: MONTHS[monthIndex], total: value });
+    if (value > max) max = value;
+  }
+
+  var container = document.getElementById("monthly-chart");
   container.innerHTML = "";
-  const frag = document.createDocumentFragment();
 
-  sorted.forEach(m => {
-    const bar = el("div", "bar-col");
-    const fill = el("div", "bar-fill");
-    fill.style.height = (m.total / max) * 100 + "%";
-    fill.title = `${m.label}: ${m.total} contributions`;
-    bar.append(el("span", "bar-value", m.total), fill, el("span", "bar-label", m.label));
-    frag.appendChild(bar);
-  });
-  container.appendChild(frag);
+  for (var j = 0; j < monthData.length; j++) {
+    var barCol = document.createElement("div");
+    barCol.className = "bar-col";
+
+    var valueLabel = document.createElement("span");
+    valueLabel.className = "bar-value";
+    valueLabel.textContent = monthData[j].total;
+
+    var fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.height = (monthData[j].total / max) * 100 + "%";
+    fill.title = monthData[j].label + ": " + monthData[j].total + " contributions";
+
+    var monthLabel = document.createElement("span");
+    monthLabel.className = "bar-label";
+    monthLabel.textContent = monthData[j].label;
+
+    barCol.appendChild(valueLabel);
+    barCol.appendChild(fill);
+    barCol.appendChild(monthLabel);
+    container.appendChild(barCol);
+  }
 }
 
 // ─── WEEKDAY CHART ───
+
 function renderWeekdayChart(totals, counts) {
-  const avgs = totals.map((t, i) => counts[i] > 0 ? t / counts[i] : 0);
-  const max = Math.max(...avgs, 1);
+  // Calculate average contributions per weekday
+  var averages = [];
+  var max = 1;
+  for (var i = 0; i < 7; i++) {
+    var avg = counts[i] > 0 ? totals[i] / counts[i] : 0;
+    averages.push(avg);
+    if (avg > max) max = avg;
+  }
 
-  const container = $("weekday-chart");
+  var container = document.getElementById("weekday-chart");
   container.innerHTML = "";
-  const frag = document.createDocumentFragment();
 
-  WEEKDAYS_FULL.forEach((name, i) => {
-    const row = el("div", "weekday-row");
-    const barWrap = el("div", "weekday-bar-wrap");
-    const fill = el("div", "weekday-bar-fill");
-    fill.style.width = (avgs[i] / max) * 100 + "%";
+  for (var j = 0; j < 7; j++) {
+    var row = document.createElement("div");
+    row.className = "weekday-row";
+
+    var label = document.createElement("span");
+    label.className = "weekday-label";
+    label.textContent = WEEKDAYS_FULL[j].slice(0, 3);
+
+    var barWrap = document.createElement("div");
+    barWrap.className = "weekday-bar-wrap";
+
+    var fill = document.createElement("div");
+    fill.className = "weekday-bar-fill";
+    fill.style.width = (averages[j] / max) * 100 + "%";
+
     barWrap.appendChild(fill);
-    row.append(
-      el("span", "weekday-label", name.slice(0, 3)),
-      barWrap,
-      el("span", "weekday-val", `${avgs[i].toFixed(1)} avg (${totals[i]} total)`)
-    );
-    frag.appendChild(row);
-  });
-  container.appendChild(frag);
+
+    var valueText = document.createElement("span");
+    valueText.className = "weekday-val";
+    valueText.textContent = averages[j].toFixed(1) + " avg (" + totals[j] + " total)";
+
+    row.appendChild(label);
+    row.appendChild(barWrap);
+    row.appendChild(valueText);
+    container.appendChild(row);
+  }
 }
 
 // ─── REPOSITORIES ───
+
 function renderRepos(pinned, allRepos) {
-  const repos = pinned.length > 0 ? pinned : allRepos.slice(0, 6);
-  $("repos-title").textContent = pinned.length > 0 ? "Pinned Repositories" : "Popular Repositories";
+  var repos = pinned.length > 0 ? pinned : allRepos.slice(0, 6);
+  var titleText = pinned.length > 0 ? "Pinned Repositories" : "Popular Repositories";
+  document.getElementById("repos-title").textContent = titleText;
 
-  const grid = $("repos-grid");
+  var grid = document.getElementById("repos-grid");
   grid.innerHTML = "";
-  const frag = document.createDocumentFragment();
 
-  repos.forEach(repo => {
-    const card = el("a", "repo-card");
+  for (var i = 0; i < repos.length; i++) {
+    var repo = repos[i];
+
+    var card = document.createElement("a");
+    card.className = "repo-card";
     card.href = repo.url;
     card.target = "_blank";
     card.rel = "noopener noreferrer";
 
-    const meta = el("div", "repo-meta");
+    var name = document.createElement("h4");
+    name.className = "repo-name";
+    name.textContent = repo.name;
+
+    var desc = document.createElement("p");
+    desc.className = "repo-desc";
+    desc.textContent = repo.description || "No description";
+
+    var meta = document.createElement("div");
+    meta.className = "repo-meta";
+
     if (repo.primaryLanguage) {
-      const lang = el("span", "repo-lang");
-      lang.innerHTML = `<span class="lang-dot" style="background:${sanitizeColor(repo.primaryLanguage.color)}"></span>${escapeHtml(repo.primaryLanguage.name)}`;
-      meta.appendChild(lang);
+      var langSpan = document.createElement("span");
+      langSpan.className = "repo-lang";
+      langSpan.innerHTML =
+        '<span class="lang-dot" style="background:' + safeColor(repo.primaryLanguage.color) + '"></span>' +
+        escapeHtml(repo.primaryLanguage.name);
+      meta.appendChild(langSpan);
     }
 
-    const stars = el("span");
-    stars.innerHTML = `${miniSvg(SVG.star)} ${repo.stargazerCount}`;
-    const forks = el("span");
-    forks.innerHTML = `${miniSvg(SVG.fork)} ${repo.forkCount}`;
-    meta.append(stars, forks);
+    var stars = document.createElement("span");
+    stars.innerHTML = makeSmallSvg(STAR_SVG) + " " + repo.stargazerCount;
+    meta.appendChild(stars);
 
-    card.append(
-      el("h4", "repo-name", repo.name),
-      el("p", "repo-desc", repo.description || "No description"),
-      meta
-    );
-    frag.appendChild(card);
-  });
-  grid.appendChild(frag);
+    var forks = document.createElement("span");
+    forks.innerHTML = makeSmallSvg(FORK_SVG) + " " + repo.forkCount;
+    meta.appendChild(forks);
+
+    card.appendChild(name);
+    card.appendChild(desc);
+    card.appendChild(meta);
+    grid.appendChild(card);
+  }
 }
 
 // ─── LANGUAGE DISTRIBUTION ───
+
 function renderLanguages(repos) {
-  const langMap = {};
-  repos.forEach(r => {
-    if (!r.primaryLanguage) return;
-    const n = r.primaryLanguage.name;
-    if (!langMap[n]) langMap[n] = { count: 0, color: sanitizeColor(r.primaryLanguage.color) };
-    langMap[n].count++;
+  // Count how many repos use each language
+  var langMap = {};
+  for (var i = 0; i < repos.length; i++) {
+    var lang = repos[i].primaryLanguage;
+    if (!lang) continue;
+    if (!langMap[lang.name]) {
+      langMap[lang.name] = { count: 0, color: safeColor(lang.color) };
+    }
+    langMap[lang.name].count++;
+  }
+
+  // Sort languages by count (most used first)
+  var sorted = Object.entries(langMap).sort(function (a, b) {
+    return b[1].count - a[1].count;
   });
 
-  const sorted = Object.entries(langMap).sort((a, b) => b[1].count - a[1].count);
-  const total = sorted.reduce((s, [, d]) => s + d.count, 0);
+  var totalRepos = 0;
+  for (var j = 0; j < sorted.length; j++) {
+    totalRepos += sorted[j][1].count;
+  }
 
-  const bar = $("language-bar"), labels = $("language-labels");
-  bar.innerHTML = labels.innerHTML = "";
+  var bar = document.getElementById("language-bar");
+  var labels = document.getElementById("language-labels");
+  bar.innerHTML = "";
+  labels.innerHTML = "";
 
-  if (!sorted.length) { bar.innerHTML = '<span class="no-data">No language data</span>'; return; }
+  if (sorted.length === 0) {
+    bar.innerHTML = '<span class="no-data">No language data</span>';
+    return;
+  }
 
-  const bFrag = document.createDocumentFragment(), lFrag = document.createDocumentFragment();
-  sorted.forEach(([name, data]) => {
-    const pct = (data.count / total) * 100;
+  for (var k = 0; k < sorted.length; k++) {
+    var langName = sorted[k][0];
+    var langData = sorted[k][1];
+    var percent = (langData.count / totalRepos) * 100;
 
-    const seg = el("div", "lang-segment");
-    seg.style.width = pct + "%";
-    seg.style.backgroundColor = data.color;
-    seg.title = `${name} ${pct.toFixed(1)}%`;
-    bFrag.appendChild(seg);
+    // Color segment in the bar
+    var segment = document.createElement("div");
+    segment.className = "lang-segment";
+    segment.style.width = percent + "%";
+    segment.style.backgroundColor = langData.color;
+    segment.title = langName + " " + percent.toFixed(1) + "%";
+    bar.appendChild(segment);
 
-    const label = el("span", "lang-label");
-    label.innerHTML = `<span class="lang-dot" style="background:${data.color}"></span>${escapeHtml(name)} <span class="lang-pct">${pct.toFixed(1)}%</span>`;
-    lFrag.appendChild(label);
-  });
-  bar.appendChild(bFrag);
-  labels.appendChild(lFrag);
+    // Label below the bar
+    var labelSpan = document.createElement("span");
+    labelSpan.className = "lang-label";
+    labelSpan.innerHTML =
+      '<span class="lang-dot" style="background:' + langData.color + '"></span>' +
+      escapeHtml(langName) +
+      ' <span class="lang-pct">' + percent.toFixed(1) + '%</span>';
+    labels.appendChild(labelSpan);
+  }
 }
