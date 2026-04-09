@@ -75,9 +75,9 @@ MIT
 ## 📅 Milestones
 
 * Milestone 1: Project setup and planning ✅
-* Milestone 2: API integration
-* Milestone 3: Core features implementation
-* Milestone 4: Deployment and final submission
+* Milestone 2: API integration ✅
+* Milestone 3: Core features implementation ✅
+* Milestone 4: Deployment and final submission ✅
 
 ## 💡 Future Enhancements
 
